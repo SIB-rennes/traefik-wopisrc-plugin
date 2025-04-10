@@ -1,0 +1,21 @@
+entryPoints:
+  web:
+    address: ":8080"
+
+log:
+  level: DEBUG
+
+api:
+  dashboard: true
+  insecure: true
+
+experimental:
+  plugins:
+    wopisrcsticky:
+      moduleName: "github.com/tonrepo/traefik-wopisrc-plugin"
+      version: "v0.1.0"
+
+providers:
+  file:
+    directory: "/etc/traefik/config"
+    watch: true

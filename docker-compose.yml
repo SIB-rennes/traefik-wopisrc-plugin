@@ -1,0 +1,39 @@
+version: "3"
+
+services:
+  traefik:
+    image: traefik:v2.11
+    command:
+      - "--api.insecure=true"   # Activer le dashboard Traefik en mode insecure
+      - "--api.dashboard=true"   # Activer le dashboard
+      - "--entrypoints.web.address=:8080"  # Configuration de l'entrypoint web
+      - "--entrypoints.websecure.address=:8443"  # Entry point sécurisé
+      - "--experimental.plugins.wopisrcsticky.moduleName=github.com/SIB-rennes/traefik-wopisrc-plugin"
+      - "--experimental.plugins.wopisrcsticky.version=v0.1.0"
+      - "--log.level=DEBUG"  # Niveau de log (DEBUG pour plus de détails)
+      - "--configFile=/etc/traefik/traefik.yml"
+    ports:
+      - "8080:8080"   # Dashboard Traefik
+      - "8888:8888"   # Utilisé pour tester le service Echo
+      - "80:80"       # Web HTTP
+      - "443:443"     # Web HTTPS
+    networks:
+      - app_network
+    volumes:
+      - ./dev/traefik.yml:/etc/traefik/traefik.yml
+      - ./dev/config:/etc/traefik/config
+      - .:/plugins-local/src/github.com/SIB-rennes/traefik-wopisrc-plugin
+
+  whoami:
+    image: traefik/whoami
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.whoami.rule=Host(`whoami.local`)"  # Règle Traefik pour accéder à whoami via whoami.local
+      - "traefik.http.services.whoami.loadbalancer.server.port=80"  # Port du service whoami
+    networks:
+      - app_network
+    restart: always
+
+networks:
+  app_network:
+    driver: overlay
