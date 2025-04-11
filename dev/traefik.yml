@@ -1,6 +1,6 @@
 entryPoints:
   web:
-    address: ":8080"
+    address: ":80"
 
 log:
   level: DEBUG
@@ -10,12 +10,13 @@ api:
   insecure: true
 
 experimental:
-  plugins:
-    wopisrcsticky:
-      moduleName: "github.com/tonrepo/traefik-wopisrc-plugin"
-      version: "v0.1.0"
+  localPlugins:
+    traefik-wopisrc-plugin:
+      moduleName: github.com/SIB-rennes/traefik-wopisrc-plugin
+
 
 providers:
-  file:
-    directory: "/etc/traefik/config"
-    watch: true
+  docker:
+    swarmMode: true
+    endpoint: 'unix:///var/run/docker.sock'
+    exposedByDefault: false

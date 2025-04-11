@@ -3,37 +3,49 @@ version: "3"
 services:
   traefik:
     image: traefik:v2.11
-    command:
-      - "--api.insecure=true"   # Activer le dashboard Traefik en mode insecure
-      - "--api.dashboard=true"   # Activer le dashboard
-      - "--entrypoints.web.address=:8080"  # Configuration de l'entrypoint web
-      - "--entrypoints.websecure.address=:8443"  # Entry point sécurisé
-      - "--experimental.plugins.wopisrcsticky.moduleName=github.com/SIB-rennes/traefik-wopisrc-plugin"
-      - "--experimental.plugins.wopisrcsticky.version=v0.1.0"
-      - "--log.level=DEBUG"  # Niveau de log (DEBUG pour plus de détails)
-      - "--configFile=/etc/traefik/traefik.yml"
+    # command:
+    #   - "--api.insecure=true"
+    #   - "--api.dashboard=true"
+    #   - "--entrypoints.web.address=:80"
+    #   - "--log.level=DEBUG"
+    #   - "--providers.docker.swarmmode=true"
+    #   - "--providers.docker.endpoint=unix:///var/run/docker.sock"
+    #   - "--providers.docker.exposedbydefault=false"
     ports:
-      - "8080:8080"   # Dashboard Traefik
-      - "8888:8888"   # Utilisé pour tester le service Echo
-      - "80:80"       # Web HTTP
-      - "443:443"     # Web HTTPS
-    networks:
-      - app_network
+      - target: 80
+        published: 80
+        mode: host
+      - target: 8080
+        published: 8081
+        mode: host
     volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./dev/traefik.yml:/etc/traefik/traefik.yml
-      - ./dev/config:/etc/traefik/config
       - .:/plugins-local/src/github.com/SIB-rennes/traefik-wopisrc-plugin
+    deploy:
+      labels:
+        # Labels pour activer l'accès au dashboard Traefik
+        - "traefik.enable=true"
+        - "traefik.http.routers.traefik-dashboard.rule=Host(`traefik.127.0.0.1.nip.io`)" 
+        - "traefik.http.routers.traefik-dashboard.entrypoints=web"  # Associer le dashboard à l'entrypoint 'web' (8080)
+        - "traefik.http.services.traefik-dashboard.loadbalancer.server.port=8080"  # Port interne du dashboard Traefik
+
 
   whoami:
     image: traefik/whoami
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.whoami.rule=Host(`whoami.local`)"  # Règle Traefik pour accéder à whoami via whoami.local
-      - "traefik.http.services.whoami.loadbalancer.server.port=80"  # Port du service whoami
-    networks:
-      - app_network
-    restart: always
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    deploy:
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.whoami.rule=Host(`whoami.127.0.0.1.nip.io`)"
+        - "traefik.http.routers.whoami.entrypoints=web"
+        - "traefik.http.routers.whoami.middlewares=whoami-plugin"
+        - "traefik.http.services.whoami.loadbalancer.server.port=80"
+        - "traefik.http.middlewares.whoami-plugin.plugin.traefik-wopisrc-plugin=true"
+      replicas: 3
 
 networks:
   app_network:
     driver: overlay
+    attachable: true
