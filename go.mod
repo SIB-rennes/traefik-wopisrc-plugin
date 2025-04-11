@@ -1,3 +1,3 @@
-module github.com/SIB-rennes/traefik-wopisrc-plugin
+module github.com/traefik/plugindemo
 
-go 1.23
+go 1.19

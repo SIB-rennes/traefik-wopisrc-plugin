@@ -1,18 +1,11 @@
-# The name of your plugin as displayed in the Plugins Catalog web UI.
-displayName: Plugin WopiSrc sticky
-
-# For now, `middleware` is the only type available.
+displayName: Demo Plugin
 type: middleware
 
-runtime: wasm
+import: github.com/SIB_RENNES/traefik-wopisrc-plugin
 
-# A brief description of what your plugin is doing.
-summary: Description of what my plugin is doing
+summary: '[Demo] Add Request Header'
 
-
-# Configuration data for your plugin.
-# This is mandatory,
-# and Plugins Catalog will try to execute the plugin with the data you provide as part of its startup validity tests.
 testData:
   Headers:
-    Foo: Bar
+    X-Demo: test
+    X-URL: '{{URL}}'

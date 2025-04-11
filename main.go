@@ -1,4 +1,4 @@
-package wopisrcsticky
+package traefik_wopisrc_plugin
 
 import (
 	"context"

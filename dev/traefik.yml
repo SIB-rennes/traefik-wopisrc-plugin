@@ -12,7 +12,7 @@ api:
 experimental:
   localPlugins:
     traefik-wopisrc-plugin:
-      moduleName: github.com/SIB-rennes/traefik-wopisrc-plugin
+      moduleName: github.com/SIB_RENNES/traefik-wopisrc-plugin
 
 
 providers:
