@@ -1,3 +1,3 @@
-module github.com/SIB_RENNES/traefik-wopisrc-plugin
+module github.com/SIB-rennes/traefik-wopisrc-plugin
 
 go 1.23

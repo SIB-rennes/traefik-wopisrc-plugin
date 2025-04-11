@@ -21,7 +21,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./dev/traefik.yml:/etc/traefik/traefik.yml
-      - .:/plugins-local/src/github.com/SIB_RENNES/traefik-wopisrc-plugin
+      - .:/plugins-local/src/github.com/SIB-rennes/traefik-wopisrc-plugin
     deploy:
       labels:
         # Labels pour activer l'accès au dashboard Traefik

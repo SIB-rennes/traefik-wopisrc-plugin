@@ -1,7 +1,7 @@
 displayName: Demo Plugin
 type: middleware
 
-import: github.com/SIB_RENNES/traefik-wopisrc-plugin
+import: github.com/SIB-rennes/traefik-wopisrc-plugin
 
 summary: '[Demo] Add Request Header'
 
