@@ -33,6 +33,7 @@ services:
 
   whoami:
     image: traefik/whoami
+    hostname: "whoami-{{.Task.Slot}}"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     deploy:
@@ -43,6 +44,7 @@ services:
         - "traefik.http.routers.whoami.middlewares=whoami-plugin"
         - "traefik.http.services.whoami.loadbalancer.server.port=80"
         - "traefik.http.middlewares.whoami-plugin.plugin.traefik-wopisrc-plugin=true"
+        - "traefik.http.services.whoami.loadbalancer.sticky.cookie.name=traefik_collabora_sticky"
       replicas: 3
 
 networks:
