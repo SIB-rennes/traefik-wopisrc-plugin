@@ -34,7 +34,7 @@ whoami:
 ```
 
 
-⚙️ Plugin Options
+## ⚙️ Plugin Options
 
 | Key | Type | Description | Required | Default |
 | :--------------- |:---------------| :----- |:----- | :----- |
@@ -47,7 +47,7 @@ whoami:
 
 
 
-🧩 Project Structure  
+## 🧩 Project Structure  
 This plugin follows the standard Traefik v2 plugin layout. Your plugins-local folder should follow this structure:
 
 ```go
@@ -61,7 +61,7 @@ plugins-local/
             redis.go
 ```
 
-⚠️ Notes
+## ⚠️ Notes
 This plugin only works with Redis. Make sure Traefik can reach your Redis instance.
 
 The queryName parameter is mandatory. Without it, the plugin will not function.
@@ -72,10 +72,10 @@ A simple connection pool of 5 Redis clients is used.
 
 
 
-👥 Authors  
+## 👥 Authors  
 Developed by SIB Rennes to support persistent sessions for services like Collabora through Traefik.
 
 
-🛡️ License   
+## 🛡️ License   
 MIT — Free to use, modify, and integrate into your own projects.
 
