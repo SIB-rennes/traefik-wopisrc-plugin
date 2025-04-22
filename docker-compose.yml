@@ -47,6 +47,11 @@ services:
         - "traefik.http.services.whoami.loadbalancer.sticky.cookie.name=traefik_collabora_sticky"
       replicas: 3
 
+  redis:
+    image: redis:7.4.2
+    ports:
+      - "60379:6379"
+
 networks:
   app_network:
     driver: overlay

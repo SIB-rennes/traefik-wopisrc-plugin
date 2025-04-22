@@ -10,21 +10,30 @@ import (
 	"log"
 	"net/http"
 	"runtime"
+	"time"
 	"strings"
-	"sync"
+	"github.com/SIB-rennes/traefik-wopisrc-plugin/internal/redis"
 )
 
 // Config the plugin configuration.
 type Config struct {
-	CacheSize  int    `json:"cacheSize,omitempty"`
 	CookieName string `json:"cookieName,omitempty"`
+	RedisAddr  string `json:"redisAddr,omitempty"`
+	RedisDB uint `json:"redisDb,omitempty" yaml:"redisDb,omitempty"`
+	// RedisPassword holds the password used to AUTH against a redis server, if it
+	// is protected by a AUTH
+	// if you dont want to put the password in clear text in the config definition
+	RedisPassword string `json:"redisPassword,omitempty" yaml:"redisPassword,omitempty"`
+	// ConnectionTimeout is the read and write connection timeout to redis.
+	// By default it is 2 seconds
+	RedisConnectionTimeout int64 `json:"redisConnectionTimeout,omitempty" yaml:"redisConnectionTimeout,omitempty"`
 }
 
 // CreateConfig creates the default plugin configuration.
 func CreateConfig() *Config {
 	return &Config{
-		CacheSize:  1000,
 		CookieName: "traefik_collabora_sticky",
+		RedisAddr: "redis:6379",
 	}
 }
 
@@ -32,8 +41,7 @@ type WOPISrcSticky struct {
 	next   http.Handler
 	Config *Config
 	name   string
-	cache  map[string]string
-	mu     sync.RWMutex
+	redisClient redis.Client
 }
 
 func (c *WOPISrcSticky) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
@@ -66,6 +74,7 @@ func (c *WOPISrcSticky) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 			}
 		}
 		if newCookies != "" {
+			log.Printf("Set cookie For woisrc %s : %s", wopiSrc, newCookies)
 			req.Header.Set("Cookie", newCookies)
 		} else {
 			req.Header.Del("Cookie")
@@ -77,15 +86,13 @@ func (c *WOPISrcSticky) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	hash := md5.Sum([]byte(wopiSrc))
 	hashStr := hex.EncodeToString(hash[:])
 
-	c.mu.RLock()
-	cookieVal, found := c.cache[hashStr]
-	c.mu.RUnlock()
-
-	fmt.Printf("cache found: %v, wopisrc: %v, cookie: %v \n", found, wopiSrc, cookieVal)
-	if found {
+	cookieValue, err := c.redisClient.GetKey(hashStr)
+	log.Printf("[Redis] Search in redis for %s return %s\n", hashStr, cookieValue)
+	if err == nil && cookieValue != "" {
+		log.Printf("[Redis] Found cookie for %s: %s\n", hashStr, cookieValue)
 		req.AddCookie(&http.Cookie{
 			Name:     c.Config.CookieName,
-			Value:    cookieVal,
+			Value:    cookieValue,
 			Path:     "/",
 			HttpOnly: true,
 		})
@@ -97,9 +104,8 @@ func (c *WOPISrcSticky) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		body:           &bytes.Buffer{},
 	}
 
-	log.Println("Cookies envoyés au backend :")
 	for _, ck := range req.Cookies() {
-		log.Printf(" - %s = %s", ck.Name, ck.Value)
+		log.Printf("Cookies envoyés au backend - %s = %s", ck.Name, ck.Value)
 	}
 
 	c.next.ServeHTTP(rec, req)
@@ -108,10 +114,8 @@ func (c *WOPISrcSticky) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	fmt.Printf("resp cookie: %v, len: %v \n", rec.cookies, len(rec.cookies))
 	for _, cookie := range rec.cookies {
 		if cookie.Name == c.Config.CookieName {
-			fmt.Printf("update cookie, wopi: %s, cookie: %s\n", hashStr, cookie.Value)
-			c.mu.Lock()
-			c.cache[hashStr] = cookie.Value
-			c.mu.Unlock()
+			fmt.Printf("[Redis] update cookie, wopi: %s, cookie: %s\n", hashStr, cookie.Value)
+			_ = c.redisClient.Set(hashStr, cookie.Value, 30*time.Minute)
 		}
 		http.SetCookie(rw, cookie)
 	}
@@ -161,15 +165,29 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 	goVersion := runtime.Version()
 	fmt.Printf("set up StickyHeader plugin, go version: %v, config: %v", goVersion, config)
 
-	// cache, err := lru.New(config.CacheSize)
-	// if err != nil {
-	// 	return nil, fmt.Errorf("failed to create LRU cache: %w", err)
-	// }
+	if config.RedisAddr == "" {
+		config.RedisAddr = "redis:6379"
+	}
+	
+	if config.RedisConnectionTimeout < 1 {
+		config.RedisConnectionTimeout = 2
+	}
+
+	client, err := redis.NewClient(
+		config.RedisAddr,
+		config.RedisDB,
+		config.RedisPassword,
+		time.Duration(config.RedisConnectionTimeout)*time.Second,
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("unable to create redis client: %v", err)
+	}
 
 	return &WOPISrcSticky{
 		Config: config,
 		next:   next,
 		name:   name,
-		cache:  make(map[string]string),
+		redisClient: client,
 	}, nil
 }
