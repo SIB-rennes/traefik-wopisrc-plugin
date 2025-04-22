@@ -36,13 +36,14 @@ whoami:
 
 ⚙️ Plugin Options
 
-Key | Type | Description | Required | Default
-cookieName | string | Name of the sticky session cookie | No | traefik_collabora_sticky
-redisAddr | string | Redis address | No | redis:6379
-redisDb | uint | Redis database number | No | 0
-redisPassword | string | Redis password (optional) | No | (empty)
-redisConnectionTimeout | int | Timeout in seconds for Redis connection | No | 2
-queryName | string | Query parameter used as the sticky key (e.g., WOPISrc) | ✅ Yes | (none)
+| Key | Type | Description | Required | Default |
+| :--------------- |:---------------| :----- |:----- | :----- |
+| queryName | string | Query parameter used as the sticky key (e.g., WOPISrc) | ✅ Yes | (none) |
+| cookieName | string | Name of the sticky session cookie | No | traefik_collabora_sticky |
+| redisAddr | string | Redis address | No | redis:6379 |
+| redisDb | uint | Redis database number | No | 0 |
+| redisPassword | string | Redis password (optional) | No | (empty) |
+| redisConnectionTimeout | int | Timeout in seconds for Redis connection | No | 2 |
 
 
 
