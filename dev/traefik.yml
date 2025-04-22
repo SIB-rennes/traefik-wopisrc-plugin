@@ -11,8 +11,8 @@ api:
 
 experimental:
   localPlugins:
-    traefik-wopisrc-plugin:
-      moduleName: github.com/SIB-rennes/traefik-wopisrc-plugin
+    traefik_query_sticky:
+      moduleName: github.com/SIB-rennes/traefik_query_sticky
 
 
 providers:

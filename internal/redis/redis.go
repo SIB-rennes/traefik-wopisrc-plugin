@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
-	"log"
 	"net"
 	"strconv"
 	"strings"
@@ -29,7 +28,7 @@ type ClientImpl struct {
 	maxActive         int
 	dialTimeout       time.Duration
 	auth              string
-	db                int
+	db                uint
 	connectionTimeout time.Duration
 }
 
@@ -48,6 +47,7 @@ func NewClient(addr string, db uint, authpassword string, connectionTimeout time
 		dialTimeout:       connectionTimeout * 2,
 		auth:              authpassword,
 		connectionTimeout: connectionTimeout,
+		db: db,
 	}
 
 	// Prepopulate the pool with connections
@@ -72,7 +72,7 @@ func (r *ClientImpl) newConn() (net.Conn, error) {
 			return nil, err
 		}
 	}
-	if _, err := sendCommand(conn, r.dialTimeout, "SELECT", strconv.Itoa(r.db)); err != nil {
+	if _, err := sendCommand(conn, r.dialTimeout, "SELECT", strconv.Itoa(int(r.db))); err != nil {
 		conn.Close()
 		return nil, err
 	}
@@ -214,19 +214,14 @@ func (r *ClientImpl) Set(key, value string, expiration time.Duration) error {
 
 func (r *ClientImpl) GetKey(key string) (string, error) {
 	conn, err := r.get()
-	log.Printf("GET KEY  REDIS %s", key)
 	if err != nil {
-		log.Printf("GET KEY  NIL ")
 		return "", err
 	}
 	defer r.put(conn)
 
 	res, err := sendCommand(conn, r.connectionTimeout, "GET", key)
-	log.Printf("GET KEY RESPONSE %s ", res)
 
 	if err != nil {
-		log.Printf("GET KEY  NIL 2")
-
 		// reset la connexion si besoin
 		conn.Close()
 		return "", err
@@ -240,7 +235,6 @@ func (r *ClientImpl) GetKey(key string) (string, error) {
 	if !ok {
 		return "", fmt.Errorf("unexpected type for GET result: %T", res)
 	}
-	log.Printf("GET KEY RETURN %s ", val)
 	return val, nil
 }
 

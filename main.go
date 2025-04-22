@@ -1,4 +1,4 @@
-package traefik_wopisrc_plugin
+package traefik_query_sticky
 
 
 import (
@@ -12,12 +12,13 @@ import (
 	"runtime"
 	"time"
 	"strings"
-	"github.com/SIB-rennes/traefik-wopisrc-plugin/internal/redis"
+	"github.com/SIB-rennes/traefik_query_sticky/internal/redis"
 )
 
 // Config the plugin configuration.
 type Config struct {
-	CookieName string `json:"cookieName,omitempty"`
+	CookieName string `json:"cookieName"`
+	QueryName string `json:"queryName"`
 	RedisAddr  string `json:"redisAddr,omitempty"`
 	RedisDB uint `json:"redisDb,omitempty" yaml:"redisDb,omitempty"`
 	// RedisPassword holds the password used to AUTH against a redis server, if it
@@ -33,26 +34,27 @@ type Config struct {
 func CreateConfig() *Config {
 	return &Config{
 		CookieName: "traefik_collabora_sticky",
-		RedisAddr: "redis:6379",
+		RedisAddr: "localhost:6379",
+		RedisConnectionTimeout: 1,
 	}
 }
 
-type WOPISrcSticky struct {
+type QuerySticky struct {
 	next   http.Handler
 	Config *Config
 	name   string
 	redisClient redis.Client
 }
 
-func (c *WOPISrcSticky) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+func (c *QuerySticky) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	log.Printf("Incoming request: %s %s\n", req.Method, req.URL)
 
-	// Get the WOPISrc parameter from the query string
-	wopiSrc := req.URL.Query().Get("WOPISrc")
+	// Get the queryparam
+	queryName := c.Config.QueryName
+	queryValue := req.URL.Query().Get(queryName)
 
-	// TODO gérer le cas si vide. Il faudrait que ca loadBalance 
-	if wopiSrc == "" {
-		log.Println("Cookies envoyés au backend sans wopi:")
+	if queryValue == "" {
+		log.Println("Cookies envoyés au backend sans Query:")
 		for _, ck := range req.Cookies() {
 			log.Printf(" - %s = %s", ck.Name, ck.Value)
 		}
@@ -60,7 +62,7 @@ func (c *WOPISrcSticky) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if wopiSrc != "" {
+	if queryValue != "" {
 		log.Printf("CHECK HEADER COOKIE")
 		cookieHeader := req.Header.Get("Cookie")
 		newCookies := ""
@@ -74,16 +76,16 @@ func (c *WOPISrcSticky) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 			}
 		}
 		if newCookies != "" {
-			log.Printf("Set cookie For woisrc %s : %s", wopiSrc, newCookies)
+			log.Printf("Set cookie For queryValue %s : %s", queryValue, newCookies)
 			req.Header.Set("Cookie", newCookies)
 		} else {
 			req.Header.Del("Cookie")
 		}
-		log.Printf("Removed existing sticky cookie for custom WOPISrc: %s", wopiSrc)
+		log.Printf("Removed existing sticky cookie for custom Query: %s", queryValue)
 	}
 	
 
-	hash := md5.Sum([]byte(wopiSrc))
+	hash := md5.Sum([]byte(queryValue))
 	hashStr := hex.EncodeToString(hash[:])
 
 	cookieValue, err := c.redisClient.GetKey(hashStr)
@@ -114,7 +116,7 @@ func (c *WOPISrcSticky) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	fmt.Printf("resp cookie: %v, len: %v \n", rec.cookies, len(rec.cookies))
 	for _, cookie := range rec.cookies {
 		if cookie.Name == c.Config.CookieName {
-			fmt.Printf("[Redis] update cookie, wopi: %s, cookie: %s\n", hashStr, cookie.Value)
+			fmt.Printf("[Redis] update cookie, query: %s, cookie: %s\n", hashStr, cookie.Value)
 			_ = c.redisClient.Set(hashStr, cookie.Value, 30*time.Minute)
 		}
 		http.SetCookie(rw, cookie)
@@ -166,11 +168,11 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 	fmt.Printf("set up StickyHeader plugin, go version: %v, config: %v", goVersion, config)
 
 	if config.RedisAddr == "" {
-		config.RedisAddr = "redis:6379"
+		config.RedisAddr = "localhost:6379"
 	}
 	
 	if config.RedisConnectionTimeout < 1 {
-		config.RedisConnectionTimeout = 2
+		config.RedisConnectionTimeout = 1
 	}
 
 	client, err := redis.NewClient(
@@ -184,7 +186,7 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 		return nil, fmt.Errorf("unable to create redis client: %v", err)
 	}
 
-	return &WOPISrcSticky{
+	return &QuerySticky{
 		Config: config,
 		next:   next,
 		name:   name,
