@@ -1,11 +1,12 @@
-displayName: Demo Plugin
+displayName: Traefik Query Sticky Plugin
 type: middleware
+iconPath: .assets/logo.png
 
-import: github.com/SIB-rennes/traefik_query_sticky
 
-summary: '[Demo] Add Request Header'
+import: https://github.com/SIB-rennes/traefik_query_sticky
+
+summary: 'A Traefik middleware plugin that enables sticky sessions based on a dynamic query parameter (e.g. `WOPISrc`), storing sticky data in Redis. Designed for scenarios such as Collabora or other session-sensitive services'
 
 testData:
-  Headers:
-    X-Demo: test
-    X-URL: '{{URL}}'
+  cookieName: whoami_session
+  queryName: WOPISrc
