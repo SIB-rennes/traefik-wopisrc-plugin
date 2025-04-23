@@ -50,6 +50,30 @@ type QuerySticky struct {
 func (c *QuerySticky) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	fmt.Printf("Incoming request: %s %s\n", req.Method, req.URL)
 
+	if req.Header.Get("Upgrade") == "websocket" {
+        // Tente de hijacker la connexion si le ResponseWriter le permet
+        if hijacker, ok := rw.(http.Hijacker); ok {
+            conn, buf, err := hijacker.Hijack()
+            if err != nil {
+                fmt.Println("Failed to hijack connection:", err)
+                http.Error(rw, "Failed to upgrade connection", http.StatusInternalServerError)
+                return
+            }
+            fmt.Println("Successfully hijacked WebSocket connection")
+            // Gère ici la connexion WebSocket : utilisation de conn et buf pour l'échange de données
+
+            // Fermeture de la connexion après usage
+            defer conn.Close()
+
+            // Message de démarrage (exemple)
+            fmt.Fprintln(conn, "WebSocket connection established")
+            return // Ne pas continuer normalement avec la réponse HTTP
+        } else {
+            fmt.Println("Hijacker not available for WebSocket")
+        }
+    }
+
+
 	// Get the queryparam
 	queryName := c.Config.QueryName
 	queryValue := req.URL.Query().Get(queryName)
