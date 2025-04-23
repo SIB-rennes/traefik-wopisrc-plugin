@@ -222,7 +222,7 @@ func (r *ClientImpl) GetKey(key string) (string, error) {
 	res, err := sendCommand(conn, r.connectionTimeout, "GET", key)
 
 	if err != nil {
-		// reset la connexion si besoin
+		// reset connection
 		conn.Close()
 		return "", err
 	}

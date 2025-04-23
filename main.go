@@ -28,6 +28,7 @@ type Config struct {
 	// ConnectionTimeout is the read and write connection timeout to redis.
 	// By default it is 2 seconds
 	RedisConnectionTimeout int64 `json:"redisConnectionTimeout,omitempty" yaml:"redisConnectionTimeout,omitempty"`
+	RedisTTL  int64 `json:"redisTTL,omitempty" yaml:"redisDb,omitempty"` // in minute
 }
 
 // CreateConfig creates the default plugin configuration.
@@ -36,6 +37,7 @@ func CreateConfig() *Config {
 		CookieName: "traefik_collabora_sticky",
 		RedisAddr: "localhost:6379",
 		RedisConnectionTimeout: 1,
+		RedisTTL: 30,
 	}
 }
 
@@ -117,7 +119,7 @@ func (c *QuerySticky) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	for _, cookie := range rec.cookies {
 		if cookie.Name == c.Config.CookieName {
 			fmt.Printf("[Redis] update cookie, query: %s, cookie: %s\n", hashStr, cookie.Value)
-			_ = c.redisClient.Set(hashStr, cookie.Value, 30*time.Minute)
+			_ = c.redisClient.Set(hashStr, cookie.Value, time.Duration(c.Config.RedisTTL)*time.Minute)
 		}
 		http.SetCookie(rw, cookie)
 	}
@@ -173,6 +175,10 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 	
 	if config.RedisConnectionTimeout < 1 {
 		config.RedisConnectionTimeout = 1
+	}
+
+	if config.RedisTTL <= 0 {
+		config.RedisTTL = 30 // fallback to 30 minutes
 	}
 
 	client, err := redis.NewClient(

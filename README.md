@@ -44,7 +44,7 @@ whoami:
 | redisDb | uint | Redis database number | No | 0 |
 | redisPassword | string | Redis password (optional) | No | (empty) |
 | redisConnectionTimeout | int | Timeout in seconds for Redis connection | No | 2 |
-
+| redisTTL | int | TTL (in minutes) for Redis keys | No | 30 |
 
 
 ## 🧩 Project Structure  
