@@ -30,6 +30,10 @@ type ClientImpl struct {
 	auth              string
 	db                uint
 	connectionTimeout time.Duration
+	failCount      int
+	failThreshold  int
+	failResetAfter time.Duration
+	lastFail       time.Time
 }
 
 // NewClient initializes a new redis cleint with connection pool
@@ -44,10 +48,13 @@ func NewClient(addr string, db uint, authpassword string, connectionTimeout time
 		conns:             make(chan net.Conn, maxActive),
 		addr:              addr,
 		maxActive:         maxActive,
-		dialTimeout:       connectionTimeout * 2,
+		dialTimeout:       connectionTimeout,
 		auth:              authpassword,
 		connectionTimeout: connectionTimeout,
 		db: db,
+		failThreshold:   10,                   // nombre max d’échecs avant reset
+		failResetAfter:  30 * time.Second,    // reset compteur si stable
+		lastFail:        time.Now(),
 	}
 
 	// Prepopulate the pool with connections
@@ -80,16 +87,74 @@ func (r *ClientImpl) newConn() (net.Conn, error) {
 	return conn, nil
 }
 
-// Get retrieves a connection from the pool
 func (r *ClientImpl) get() (net.Conn, error) {
 	select {
-	case conn := <-r.conns:
-		return conn, nil
-	default:
-		conn, err := r.newConn()
-		return conn, err
+		case conn := <-r.conns:
+			err := r.pingConn(conn)
+			if err == nil {
+				r.resetFailCount()
+				return conn, nil
+			}
+			conn.Close()
+			r.registerFailure()
+			return nil, err
+		default:
+			conn, err := r.newConn()
+			if err != nil {
+				r.registerFailure()
+				return nil, err
+			}
+			r.resetFailCount()
+			return conn, nil
 	}
 }
+
+
+func (r *ClientImpl) registerFailure() {
+	now := time.Now()
+	fmt.Printf("[REDIS] Check lastfail %s > %s" , now.Sub(r.lastFail), r.failResetAfter)
+	if now.Sub(r.lastFail) > r.failResetAfter {
+		fmt.Printf("[Redis] Fail count = 1 ")
+		r.failCount = 1
+	} else {
+		fmt.Printf("[Redis] Fail count ++ = %s", r.failCount)
+		r.failCount++
+	}
+	r.lastFail = now
+
+	if r.failCount >= r.failThreshold {
+		fmt.Printf("[Redis] Too many failures, resetting connection pool...")
+		r.resetPool()
+	}
+}
+
+func (r *ClientImpl) resetFailCount() {
+	r.failCount = 0
+}
+
+func (r *ClientImpl) resetPool() {
+	for {
+		select {
+		case conn := <-r.conns:
+			conn.Close()
+		default:
+			return
+		}
+	}
+}
+
+func (r *ClientImpl) pingConn(conn net.Conn) error {
+	resp, err := sendCommand(conn, r.connectionTimeout, "PING")
+	if err != nil {
+		return err
+	}
+	if pong, ok := resp.(string); !ok || pong != "PONG" {
+		return fmt.Errorf("invalid PING response")
+	}
+	return nil
+}
+
+
 
 // Put returns a connection back to the pool
 func (r *ClientImpl) put(conn net.Conn) error {

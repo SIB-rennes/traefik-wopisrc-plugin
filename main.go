@@ -7,7 +7,6 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
-	"log"
 	"net/http"
 	"runtime"
 	"time"
@@ -49,23 +48,19 @@ type QuerySticky struct {
 }
 
 func (c *QuerySticky) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	log.Printf("Incoming request: %s %s\n", req.Method, req.URL)
+	fmt.Printf("Incoming request: %s %s\n", req.Method, req.URL)
 
 	// Get the queryparam
 	queryName := c.Config.QueryName
 	queryValue := req.URL.Query().Get(queryName)
 
 	if queryValue == "" {
-		log.Println("Cookies envoyés au backend sans Query:")
-		for _, ck := range req.Cookies() {
-			log.Printf(" - %s = %s", ck.Name, ck.Value)
-		}
+		fmt.Println("No Query found")
 		c.next.ServeHTTP(rw, req)
 		return
 	}
 
 	if queryValue != "" {
-		log.Printf("CHECK HEADER COOKIE")
 		cookieHeader := req.Header.Get("Cookie")
 		newCookies := ""
 		for _, part := range strings.Split(cookieHeader, ";") {
@@ -78,12 +73,12 @@ func (c *QuerySticky) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 			}
 		}
 		if newCookies != "" {
-			log.Printf("Set cookie For queryValue %s : %s", queryValue, newCookies)
+			fmt.Printf("Set cookie For queryValue %s : %s", queryValue, newCookies)
 			req.Header.Set("Cookie", newCookies)
 		} else {
 			req.Header.Del("Cookie")
 		}
-		log.Printf("Removed existing sticky cookie for custom Query: %s", queryValue)
+		fmt.Printf("Removed existing sticky cookie for custom Query: %s", queryValue)
 	}
 	
 
@@ -91,9 +86,9 @@ func (c *QuerySticky) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	hashStr := hex.EncodeToString(hash[:])
 
 	cookieValue, err := c.redisClient.GetKey(hashStr)
-	log.Printf("[Redis] Search in redis for %s return %s\n", hashStr, cookieValue)
+	fmt.Printf("[Redis] Search in redis for %s return %s\n", hashStr, cookieValue)
 	if err == nil && cookieValue != "" {
-		log.Printf("[Redis] Found cookie for %s: %s\n", hashStr, cookieValue)
+		fmt.Printf("[Redis] Found cookie for %s: %s\n", hashStr, cookieValue)
 		req.AddCookie(&http.Cookie{
 			Name:     c.Config.CookieName,
 			Value:    cookieValue,
@@ -109,7 +104,7 @@ func (c *QuerySticky) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	for _, ck := range req.Cookies() {
-		log.Printf("Cookies envoyés au backend - %s = %s", ck.Name, ck.Value)
+		fmt.Printf("Cookies envoyés au backend - %s = %s", ck.Name, ck.Value)
 	}
 
 	c.next.ServeHTTP(rec, req)
