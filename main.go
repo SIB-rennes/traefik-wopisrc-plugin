@@ -50,29 +50,6 @@ type QuerySticky struct {
 func (c *QuerySticky) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	fmt.Printf("Incoming request: %s %s\n", req.Method, req.URL)
 
-	if req.Header.Get("Upgrade") == "websocket" {
-        // Tente de hijacker la connexion si le ResponseWriter le permet
-        if hijacker, ok := rw.(http.Hijacker); ok {
-            conn, buf, err := hijacker.Hijack()
-            if err != nil {
-                fmt.Println("Failed to hijack connection:", err)
-                http.Error(rw, "Failed to upgrade connection", http.StatusInternalServerError)
-                return
-            }
-            fmt.Println("Successfully hijacked WebSocket connection")
-            // Gère ici la connexion WebSocket : utilisation de conn et buf pour l'échange de données
-
-            // Fermeture de la connexion après usage
-            defer conn.Close()
-
-            // Message de démarrage (exemple)
-            fmt.Fprintln(conn, "WebSocket connection established")
-            return // Ne pas continuer normalement avec la réponse HTTP
-        } else {
-            fmt.Println("Hijacker not available for WebSocket")
-        }
-    }
-
 
 	// Get the queryparam
 	queryName := c.Config.QueryName
@@ -121,29 +98,41 @@ func (c *QuerySticky) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		})
 	}
 
-	rec := &responseRecorder{
-		ResponseWriter: rw,
-		header:         http.Header{},
-		body:           &bytes.Buffer{},
-	}
 
 	for _, ck := range req.Cookies() {
 		fmt.Printf("Cookies envoyés au backend - %s = %s", ck.Name, ck.Value)
 	}
 
-	c.next.ServeHTTP(rec, req)
-	rw.WriteHeader(rec.statusCode)
 
-	fmt.Printf("resp cookie: %v, len: %v \n", rec.cookies, len(rec.cookies))
-	for _, cookie := range rec.cookies {
-		if cookie.Name == c.Config.CookieName {
-			fmt.Printf("[Redis] update cookie, query: %s, cookie: %s\n", hashStr, cookie.Value)
-			_ = c.redisClient.Set(hashStr, cookie.Value, time.Duration(c.Config.RedisTTL)*time.Minute)
+	 // Detect WebSocket upgrade and skip processing
+	if strings.ToLower(req.Header.Get("Connection")) == "upgrade" &&
+		strings.ToLower(req.Header.Get("Upgrade")) == "websocket" {
+		fmt.Println("WebSocket detected")
+		
+		req.Header.Set(c.Config.CookieName, cookieValue)
+		c.next.ServeHTTP(rw, req)
+	} else {
+
+		rec := &responseRecorder{
+			ResponseWriter: rw,
+			header:         http.Header{},
+			body:           &bytes.Buffer{},
 		}
-		http.SetCookie(rw, cookie)
+		c.next.ServeHTTP(rec, req)
+		rw.WriteHeader(rec.statusCode)
+	
+		fmt.Printf("resp cookie: %v, len: %v \n", rec.cookies, len(rec.cookies))
+		for _, cookie := range rec.cookies {
+			if cookie.Name == c.Config.CookieName {
+				fmt.Printf("[Redis] update cookie, query: %s, cookie: %s\n", hashStr, cookie.Value)
+				_ = c.redisClient.Set(hashStr, cookie.Value, time.Duration(c.Config.RedisTTL)*time.Minute)
+			}
+			http.SetCookie(rw, cookie)
+		}
+	
+		rw.Write(rec.body.Bytes())
 	}
-
-	rw.Write(rec.body.Bytes())
+	
 }
 
 type responseRecorder struct {
